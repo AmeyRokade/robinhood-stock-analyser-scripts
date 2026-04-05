@@ -19,6 +19,7 @@ export function extractAuthToken(headers) {
 
 export function showStatus(message, type = 'info') {
   const statusDiv = document.getElementById('rh-status');
+  if (!statusDiv) return;
   statusDiv.textContent = message;
   statusDiv.style.display = 'block';
   statusDiv.style.background = type === 'error' ? '#fee' : type === 'success' ? '#efe' : '#eef';
@@ -29,9 +30,11 @@ export function updateProgress(current, total, message) {
   const progressDiv = document.getElementById('rh-progress');
   const progressBar = document.getElementById('rh-progress-bar');
   const progressText = document.getElementById('rh-progress-text');
+  const progressPercent = document.getElementById('rh-progress-percent');
 
-  progressDiv.style.display = 'block';
+  if (progressDiv) progressDiv.style.display = 'block';
   const percentage = total > 0 ? (current / total) * 100 : 0;
-  progressBar.style.width = percentage + '%';
-  progressText.textContent = message || `${current} / ${total}`;
+  if (progressBar) progressBar.style.width = percentage + '%';
+  if (progressText) progressText.textContent = message || `${current} / ${total}`;
+  if (progressPercent) progressPercent.textContent = `${Math.round(percentage)}%`;
 }
