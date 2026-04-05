@@ -1,0 +1,14 @@
+{
+  "name": "robinhood-stock-analyser-scripts",
+  "version": "1.0.0",
+  "description": "Robinhood Stock Ratings & Fair Value Fetcher - Tampermonkey userscript + Python analyzer",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node --watch build.js"
+  },
+  "dependencies": {
+    "esbuild": "^0.20.0"
+  },
+  "devDependencies": {}
+}
