@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Robinhood Weekly Signal Overlay
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Shows weekly BUY/HOLD/SELL signals (momentum + sentiment + macro + short squeeze) as a floating panel on Robinhood. Signals update every Sunday with fresh weekly data.
 // @author       AmeyRokade
 // @match        *://*.robinhood.com/*
@@ -9,6 +9,8 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        unsafeWindow
+// @run-at       document-end
+// @noframes
 // @connect      query1.finance.yahoo.com
 // @connect      feeds.finance.yahoo.com
 // @updateURL    https://raw.githubusercontent.com/AmeyRokade/robinhood-stock-analyser-scripts/main/weekly_signal.user.js
