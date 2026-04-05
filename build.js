@@ -47,7 +47,8 @@ async function build() {
 
     // Prepend USERSCRIPT_HEADER
     const content = readFileSync(outfile, 'utf8');
-    writeFileSync(outfile, USERSCRIPT_HEADER + '\n' + content);
+    writeFileSync(outfile, USERSCRIPT_HEADER + '
+' + content);
     
     console.log('Build complete! Output at: ' + outfile);
   } catch (err) {
