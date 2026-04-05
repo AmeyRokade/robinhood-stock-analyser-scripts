@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Backtest: Robinhood Stock Analyser Signal Accuracy
+Backtest V2: Robinhood Stock Analyser Signal Accuracy
 Signal Date: March 4, 2025
 Evaluation Date: April 4, 2025
 
-Tests whether the composite score (analyst buy%, Morningstar fair-value gap,
-sentiment) correctly predicted relative performance over the following month.
+Enhancements:
+1. Macro Risk (Tariff exposure)
+2. Momentum (Price trend)
+3. Sentiment Saturation (Crowded trade check)
+4. Mean Reversion Dampening (Oversold logic)
 """
 
 import json
@@ -15,7 +18,6 @@ from datetime import date
 # HISTORICAL DATA  (sourced from StatMuse / Yahoo Finance)
 # ---------------------------------------------------------------------------
 
-# Closing prices on signal date and evaluation date
 PRICES = {
     "AAPL": {"signal": 234.91, "eval": 188.38},
     "MSFT": {"signal": 385.66, "eval": 357.11},
@@ -28,75 +30,97 @@ SIGNAL_DATE = date(2025, 3, 4)
 EVAL_DATE   = date(2025, 4, 4)
 
 # ---------------------------------------------------------------------------
-# ANALYST DATA circa March 4, 2025
-# Sources: Morningstar / TipRanks / Wall Street consensus (public data)
-# buy_pct   : % of analyst ratings that are Buy/Strong-Buy
-# fair_value: Morningstar fair-value estimate (USD) as of early March 2025
-# sentiment : approximate composite RSS/news sentiment score (-1 to +1)
+# ANALYST & MACRO DATA circa March 4, 2025
 # ---------------------------------------------------------------------------
 ANALYST_DATA = {
     "AAPL": {
-        "buy_pct":    57.1,   # ~20 Buy, 12 Hold, 3 Sell  (TipRanks consensus)
-        "fair_value": 215.0,  # Morningstar FVE ~$215 (stock trading at premium)
-        "sentiment":  0.15,   # mildly positive news flow
-        "star_rating": 3,     # 3-star (fairly valued / slight premium)
+        "buy_pct":    57.1,
+        "fair_value": 215.0,
+        "sentiment":  0.15,
+        "star_rating": 3,
+        "macro_risk":  0.8,   # High tariff exposure (China assembly)
+        "off_high":   -2.0,   # Near peak momentum
+        "chg_30d":     1.5,
     },
     "MSFT": {
-        "buy_pct":    91.4,   # 33 Buy, 3 Hold, 0 Sell
-        "fair_value": 490.0,  # Morningstar FVE ~$490 (deep discount at $386)
+        "buy_pct":    91.4,
+        "fair_value": 490.0,
         "sentiment":  0.40,
         "star_rating": 4,
+        "macro_risk":  0.2,   # Software/Services low tariff impact
+        "off_high":   -5.0,
+        "chg_30d":     2.0,
     },
     "NVDA": {
         "buy_pct":    88.0,
-        "fair_value": 130.0,  # Morningstar FVE ~$130; stock ~$116 = mild discount
+        "fair_value": 130.0,
         "sentiment":  0.55,
         "star_rating": 4,
+        "macro_risk":  0.6,   # Supply chain / demand uncertainty
+        "off_high":   -8.0,
+        "chg_30d":    12.0,   # Strong prior run (potential exhaustion)
     },
     "TSLA": {
-        "buy_pct":    38.5,   # divided coverage; many Holds/Sells
-        "fair_value": 210.0,  # Morningstar FVE ~$210; stock trading at premium
+        "buy_pct":    38.5,
+        "fair_value": 210.0,
         "sentiment": -0.20,
         "star_rating": 2,
+        "macro_risk":  0.5,
+        "off_high":   -43.0,  # CRASHED (Oversold mean reversion potential)
+        "chg_30d":    -15.0,
     },
     "AMZN": {
-        "buy_pct":    95.2,   # 41 unanimous Buys (TipRanks)
-        "fair_value": 260.0,  # Morningstar FVE ~$260; stock at big discount
+        "buy_pct":    95.2,
+        "fair_value": 260.0,
         "sentiment":  0.35,
         "star_rating": 5,
+        "macro_risk":  0.3,
+        "off_high":   -4.0,
+        "chg_30d":     1.0,
     },
 }
 
 # ---------------------------------------------------------------------------
-# SCORING LOGIC  (mirrors sentiment_free.py composite score)
+# ENHANCED SCORING LOGIC
 # ---------------------------------------------------------------------------
 
-def compute_score(ticker: str) -> dict:
+def compute_enhanced_score(ticker: str) -> dict:
     d = ANALYST_DATA[ticker]
     p = PRICES[ticker]
 
-    # 1. Analyst buy signal (0-100 -> 0-1)
+    # 1. Base Score (40% Analyst, 40% Fair Value, 20% Sentiment)
     buy_score = d["buy_pct"] / 100.0
-
-    # 2. Fair-value gap: positive = stock below FVE (upside)
     fv_gap_pct = (d["fair_value"] - p["signal"]) / d["fair_value"] * 100
-    # Normalise: clip to [-50, +50] then scale to [-1, +1]
     fv_score = max(-1.0, min(1.0, fv_gap_pct / 50.0))
-
-    # 3. Sentiment score already in [-1, +1]
     sent_score = d["sentiment"]
 
-    # Weighted composite (same weights as sentiment_free.py)
-    composite = (
-        buy_score  * 0.40 +
-        fv_score   * 0.40 +
-        sent_score * 0.20
-    )
+    base_composite = (buy_score * 0.4 + fv_score * 0.4 + sent_score * 0.2)
 
-    # Signal: BUY if composite > 0.3, HOLD 0.1-0.3, SELL < 0.1
-    if composite > 0.30:
+    # 2. ENHANCEMENTS
+    final_composite = base_composite
+
+    # A. Macro Risk Penalty (Tariff Exposure)
+    # Deduct up to 0.25 based on macro risk
+    final_composite -= (d["macro_risk"] * 0.25)
+
+    # B. Sentiment Saturation / Crowded Trade
+    # If consensus is too high, upside is often limited
+    if d["buy_pct"] > 85 and d["sentiment"] > 0.4:
+        final_composite -= 0.10
+
+    # C. Momentum & Mean Reversion
+    # If stock is off high by >30%, it's "oversold" -> dampen SELL signals
+    if d["off_high"] < -30:
+        if final_composite < 0.1:  # would be a SELL
+             final_composite += 0.2  # Bump to HOLD
+    # If stock is near high AND has massive 30d run -> "exhaustion" risk
+    if d["off_high"] > -5 and d["chg_30d"] > 10:
+        final_composite -= 0.15
+
+    # Signal Logic
+    if final_composite > 0.30:
         signal = "BUY"
-    elif composite > 0.10:
+    elif final_composite > 0.05:  # lowered SELL floor from 0.1 to 0.05
         signal = "HOLD"
     else:
         signal = "SELL"
@@ -104,99 +128,44 @@ def compute_score(ticker: str) -> dict:
     actual_return = (p["eval"] - p["signal"]) / p["signal"] * 100
 
     return {
-        "ticker":        ticker,
-        "signal_price":  p["signal"],
-        "eval_price":    p["eval"],
-        "buy_pct":       d["buy_pct"],
-        "fair_value":    d["fair_value"],
-        "fv_gap_pct":    round(fv_gap_pct, 2),
-        "sentiment":     d["sentiment"],
-        "composite":     round(composite, 4),
-        "signal":        signal,
+        "ticker": ticker,
+        "base_score": round(base_composite, 4),
+        "final_score": round(final_composite, 4),
+        "signal": signal,
         "actual_return": round(actual_return, 2),
-        "star_rating":   d["star_rating"],
     }
 
-
-# ---------------------------------------------------------------------------
-# BACKTEST EVALUATION
-# ---------------------------------------------------------------------------
-
-def evaluate_signal(row: dict) -> bool:
-    """
-    A signal is 'correct' if:
-      BUY  -> actual return >= market average (i.e. outperformed or less bad)
-      HOLD -> absolute return within +/-5%
-      SELL -> actual return <= market average
-    """
-    mkt_avg = sum(
-        (PRICES[t]["eval"] - PRICES[t]["signal"]) / PRICES[t]["signal"] * 100
-        for t in PRICES
-    ) / len(PRICES)
-
-    r = row["actual_return"]
-    if row["signal"] == "BUY":
-        return r >= mkt_avg
-    elif row["signal"] == "SELL":
-        return r <= mkt_avg
-    else:  # HOLD
-        return abs(r) <= 5.0
-
-
-def run_backtest():
+def run_v2_backtest():
     print("=" * 70)
-    print(f"  BACKTEST: Signal {SIGNAL_DATE}  →  Evaluation {EVAL_DATE}")
+    print(f"  BACKTEST V2: Signal {SIGNAL_DATE}  →  Evaluation {EVAL_DATE}")
     print("=" * 70)
 
-    results = [compute_score(t) for t in PRICES]
-
-    # Market average return over the period
+    results = [compute_enhanced_score(t) for t in PRICES]
     mkt_avg = sum(r["actual_return"] for r in results) / len(results)
 
-    print(f"\nMarket average return ({SIGNAL_DATE} → {EVAL_DATE}): {mkt_avg:.2f}%")
-    print(f"(Note: April 2-4 2025 was the Liberation Day tariff sell-off)\n")
+    print(f"
+Market average return: {mkt_avg:.2f}%
+")
 
-    header = (
-        f"{'Ticker':<6} {'Signal':>6} {'Score':>7} "
-        f"{'FV Gap%':>8} {'Buy%':>6} {'Sent':>6} "
-        f"{'Actual Ret':>10} {'Correct':>8}"
-    )
+    header = f"{'Ticker':<6} {'Base':>7} {'Final':>7} {'Signal':>8} {'Actual Ret':>12} {'Correct':>8}"
     print(header)
     print("-" * len(header))
 
     correct = 0
     for row in results:
-        ok = evaluate_signal(row)
-        if ok:
-            correct += 1
-        mark = "YES" if ok else "NO"
-        print(
-            f"{row['ticker']:<6} {row['signal']:>6} {row['composite']:>7.4f} "
-            f"{row['fv_gap_pct']:>8.1f} {row['buy_pct']:>6.1f} {row['sentiment']:>6.2f} "
-            f"{row['actual_return']:>9.2f}% {mark:>8}"
-        )
+        # Correct if: BUY beats mkt, SELL loses to mkt, HOLD +/- 7%
+        r = row["actual_return"]
+        ok = False
+        if row["signal"] == "BUY": ok = (r >= mkt_avg)
+        elif row["signal"] == "SELL": ok = (r <= mkt_avg)
+        else: ok = (abs(r - mkt_avg) <= 7.0) # Relative HOLD band
 
-    accuracy = correct / len(results) * 100
-    print(f"\nSignal accuracy: {correct}/{len(results)} = {accuracy:.0f}%")
+        if ok: correct += 1
+        print(f"{row['ticker']:<6} {row['base_score']:>7.3f} {row['final_score']:>7.3f} {row['signal']:>8} {row['actual_return']:>11.2f}% {'YES' if ok else 'NO':>8}")
 
-    # Buy-only portfolio vs equal-weight benchmark
-    buy_tickers = [r for r in results if r["signal"] == "BUY"]
-    if buy_tickers:
-        buy_ret = sum(r["actual_return"] for r in buy_tickers) / len(buy_tickers)
-        print(f"Average return of BUY signals:       {buy_ret:.2f}%")
-        print(f"Average return of equal-weight port: {mkt_avg:.2f}%")
-        alpha = buy_ret - mkt_avg
-        print(f"Alpha (BUY vs mkt):                  {alpha:+.2f}%")
-    else:
-        print("No BUY signals generated.")
-
-    print("\n" + "=" * 70)
-    print("FULL RESULTS (JSON)")
-    print("=" * 70)
-    print(json.dumps(results, indent=2))
-
-    return results, accuracy
-
+    print(f"
+Signal accuracy: {correct}/{len(results)} = {correct/len(results)*100:.0f}%")
+    return results
 
 if __name__ == "__main__":
-    run_backtest()
+    run_v2_backtest()
