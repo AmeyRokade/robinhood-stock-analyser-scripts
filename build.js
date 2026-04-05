@@ -30,8 +30,7 @@ async function build() {
   const buildDir = join(__dirname, 'build');
   if (!existsSync(buildDir)) {
     mkdirSync(buildDir);
-  }
-
+  };
   const outfile = join(buildDir, 'script.user.js');
 
   try {
@@ -47,8 +46,7 @@ async function build() {
 
     // Prepend USERSCRIPT_HEADER
     const content = readFileSync(outfile, 'utf8');
-    writeFileSync(outfile, USERSCRIPT_HEADER + '
-' + content);
+    writeFileSync(outfile, USERSCRIPT_HEADER + '\n' + content);
     
     console.log('Build complete! Output at: ' + outfile);
   } catch (err) {
