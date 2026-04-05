@@ -41,7 +41,7 @@ if (document.readyState === 'loading') {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.shiftKey && e.key === 'R') {
     e.preventDefault();
-    const existing = document.getElementById('rh-stock-fetcher');
+    const existing = document.getElementById('robinhood-analyser-container');
     if (existing) {
       existing.remove();
     } else {
