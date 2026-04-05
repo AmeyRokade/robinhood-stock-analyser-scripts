@@ -6,11 +6,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const USERSCRIPT_HEADER = `// ==UserScript==
-// @name         Robinhood Stock Ratings & Fair Value Fetcher
+const USERSCRIPT_HEADER = \`// ==UserScript==
+// @name         Robinhood Stock Analyser & Live Signal
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Fetch analyst ratings and fair value data for stocks from Robinhood API and export to Excel
+// @version      1.1
+// @description  Fetch analyst ratings, fair value, and live signals (RSI/EMA/Sentiment) for stocks on Robinhood.
 // @author       You
 // @match        *://*.robinhood.com/*
 // @grant        GM_xmlhttpRequest
@@ -22,11 +22,11 @@ const USERSCRIPT_HEADER = `// ==UserScript==
 // @updateURL    https://raw.githubusercontent.com/AmeyRokade/robinhood-stock-analyser-scripts/main/build/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/AmeyRokade/robinhood-stock-analyser-scripts/main/build/script.user.js
 // ==/UserScript==
-`;
+\`;
 
 function build() {
   console.log('Building userscript...');
-
+  
   esbuild.build({
     entryPoints: [join(__dirname, 'src', 'main.js')],
     bundle: true,
